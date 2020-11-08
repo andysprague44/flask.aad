@@ -1,0 +1,9 @@
+{% extends "header.html" %} 
+<!-- Exports header and navbar from header.html 
+     or any file you want-->
+{% block title %}Logout{% endblock %} 
+{% block body %} 
+  <h1>Logout Complete</h1>
+  <br/>
+  <a href="{{ url_for('index') }}"><p>Click Here</a> to go to the Home Page</p> 
+{% endblock %} 

@@ -1,0 +1,7 @@
+{% extends "header.html" %} <!-- Use header and navbar from header.html -->
+{% block title %}Page Not Found{% endblock %} 
+{% block body %} 
+  <h1>Page not found!</h1>
+  <br/>
+  <a href="{{ url_for('index') }}"><p>Click Here</a> to go to the Home Page</p> 
+{% endblock %} 

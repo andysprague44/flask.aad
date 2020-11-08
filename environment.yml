@@ -1,0 +1,11 @@
+name: dashenv
+
+channels:
+  - conda-forge
+  - plotly
+
+dependencies:
+  - python=3.7
+  - pip=20.1
+  - pip:
+    - -rrequirements.txt

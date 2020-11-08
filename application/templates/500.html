@@ -1,0 +1,9 @@
+{% extends "header.html" %} <!-- Use header and navbar from header.html -->
+{% block title %}Error{% endblock %} 
+{% block body %} 
+  <h1>Fatal Error!</h1>
+  <p>{{ error }}</p>
+  <br/>
+  <a href="{{ url_for('index') }}"><p>Click Here</a> to go to the Home Page</p> 
+  <a href="{{ url_for('auth.logout') }}"><p>Click Here</a> to log-out</p> 
+{% endblock %} 
