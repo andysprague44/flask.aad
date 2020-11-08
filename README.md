@@ -1,16 +1,20 @@
 # Python / Plotly Dash Web Application with Microsoft AAD Authentication
 
-This project is an example of adding Microsoft AAd authentication to a platly dash web application.
+This project is an example of adding Microsoft AAd authentication to a [plotly dash](<https://plotly.com/dash/>) web application.
 
-Plotly dash (<https://plotly.com/dash/>), is a way to define responsive web applications purely in python, no javascript knowledge required! This project uses plotly dash with a flask server injected to give access to flask functions such as AAD authentication. This apporoach copies the example here:
+To enable AAD auth, we actually use flask, and then inject the flask server into the dash app. Dash uses flask under the covers, we are simply using our own flask server to allow for this customization! This approach is taken from the excellent example here:
     <https://hackersandslackers.com/plotly-dash-with-flask/>
 
-Additionally, it uses flask blueprints to provide routes for authentication. The blueprint should be useable by multiple applications, so should not contain application specific logic or config.
+Additionally, it uses flask blueprints to provide routes for authentication. The blueprint should be useable by multiple applications, so should not contain application specific logic or config. If you prefer, you can take just the blueprint code and drop into your existing well organized flask application, hey presto you have AAD authentication!
 
 
 ## Getting started
 
-First, copy appsettings.json and rename copy to appsettings.Development.json. Add your AAD details into this file, and add a Rapid API key which you can get from https://rapidapi.com/sportcontentapi/api/rugby-live-data/.
+You'll need an 'app registration' registered in Azure for this tutorial. You can get a free subscription at <portal.azure.com>. Then add an app reg like <https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app>: 
+
+Copy application/appsettings.json and rename the copy to application/appsettings.Development.json. 
+- Add your AAD details into this file
+- add a Rapid API key which you can get from https://rapidapi.com/sportcontentapi/api/rugby-live-data/.
 
 
 ### Running project with docker
@@ -35,7 +39,7 @@ Then run the project with
 python wsgi.py
 ```
 
-You can also debug the app from vscode by running the "Python:Flask" launch configuration, and navigating to <http://localhost:5000>.
+You can also debug the app from vscode by running the "Python:Flask" launch configuration, and navigating to <http://localhost:5000>. You will need to restart vscode after the conda env is created, then select the conda env as the Python Interpreter, for this to work.
 
 ## Deployment
 
