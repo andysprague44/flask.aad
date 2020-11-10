@@ -45,9 +45,7 @@ AuthenticationConfig = {
     "CLIENT_ID": CLIENT_ID,
     "CLIENT_SECRET": CLIENT_SECRET,
     "HTTPS_SCHEME": HTTPS_SCHEME,
-    "AUTH_RESOURCE": GRAPH_RESOURCE,
-    "AUTH_USER_INFO_ENDPOINT": GRAPH_BASE_URI + '/me',
-    "AUTH_APP_REG_DISPLAY_NAME": APPLICATION_REGISTRATION_DISPLAY_NAME
+    "AUTHORITY": f'https://login.microsoftonline.com/{TENANT}'
 }
 
 # Flask App Config
@@ -58,3 +56,4 @@ class FlaskConfig:
     SECRET_KEY= os.environ.get('SECRET_KEY', config['flask_secret_key'])
     STATIC_FOLDER = 'static'
     TEMPLATES_FOLDER = 'templates'
+    SESSION_TYPE = 'filesystem'  # Specifies the token cache should be stored in server-side session

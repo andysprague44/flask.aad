@@ -1,9 +1,9 @@
 import flask
-from flask import send_file, render_template
+from flask import send_file, render_template, session
 import os
 import time
 import traceback
-from blueprints.auth.user import User
+import msal
 from blueprints.auth.decorators import login_required
 from .dashapp import get_layout
 from . import appsettings as config
@@ -17,13 +17,15 @@ def index():
     if config.REQUIRE_AUTHENTICATION:
         # Check user is authenticated
         try:
-            displayName = flask.session['user.displayName']
+            user = flask.session['user']
+            displayName = user.get('name', 'Unknown')
             app.logger.info(f'{displayName} logged in successfully')
         except Exception as ex:
             app.logger.error('Authentication failed: {ex}')
             raise Exception('Authentication failed. Please try again. ' + str(ex))
     
-    # Load dash app
+    # Load (dash) app
+    #return render_template('index.html', user=session["user"], version=msal.__version__)
     return flask.redirect('dash/')
 
 

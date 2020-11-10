@@ -4,7 +4,6 @@ from functools import wraps
 from application import appsettings as config
 from flask import current_app
 
-
 def login_required(f):
     """
     Decorator for flask endpoints, ensuring that the user is authenticated and redirecting to log-in page if not.
@@ -22,16 +21,11 @@ def login_required(f):
         if not config.REQUIRE_AUTHENTICATION:
             # Disable authentication, for dev/test only!
             current_app.logger.error('Authentication is disabled! For dev/test only!')
+            flask.session['user'] = {'name': 'AUTHENTICATION DISABLED'}
             return f(*args, **kwargs)
 
-        if 'authToken.accessToken' not in flask.session:
+        if not flask.session.get("user"):
             return flask.redirect(flask.url_for('auth.login'))
-
-        if 'authToken.expiresOn' in flask.session:
-            expiresOn = datetime.strptime(
-                flask.session['authToken.expiresOn'], "%Y-%m-%d %H:%M:%S.%f")
-            if expiresOn < datetime.now() + timedelta(minutes=3):
-                return flask.redirect(flask.url_for('auth.login'))
-
+        
         return f(*args, **kwargs)
     return decorated_function

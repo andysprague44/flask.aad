@@ -1,0 +1,10 @@
+{% extends "header.html" %} <!-- Use header and navbar from header.html -->
+{% block title %}Flask AAD{% endblock %} 
+{% block body %} 
+    <h1>Demo Dash App with AAD authentication</h1>
+    <h2>Welcome {{ user.get("name") }}!</h2>
+    
+    <li><a href="/auth/logout">Logout</a></li>
+    <hr>
+    <footer style="text-align: right">Using MSAL Python {{ version }}</footer>
+{% endblock %} 

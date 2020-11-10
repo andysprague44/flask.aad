@@ -2,12 +2,14 @@
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 from . import appsettings as config
+from flask_session import Session  # https://pythonhosted.org/Flask-Session
 
 def create_app():
     """Construct core Flask application with embedded Dash app."""
     app = Flask(__name__)
     app.config.from_object('application.appsettings.FlaskConfig')
-
+    Session(app)
+    
     with app.app_context():
         # Flask routes
         from . import routes

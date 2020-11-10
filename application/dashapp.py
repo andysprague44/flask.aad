@@ -54,10 +54,10 @@ def create_dashapp(server):
                    Output('navbar-navigation', 'label')],
                   [Input('url', 'pathname')])
     def display_page(pathname):
-        if 'user.displayName' in flask.session:
-            user = flask.session['user.displayName']
+        if 'user' in flask.session:
+            user = flask.session['user'].get('name', 'unknown')
         else:
-            user = 'Unknown'
+            user = 'unknown'
 
         switcher = {
             '/dash/'                            : layout_main(),
@@ -119,7 +119,7 @@ def __layout_navbar():
                     dbc.Row(
                         [
                             dbc.Col(html.Img(src=PLOTLY_LOGO, height="30px")),
-                            dbc.Col(dbc.NavbarBrand("andysprague.com", className="ml-2", style={'letter-spacing': '5px'})),
+                            dbc.Col(dbc.NavbarBrand("Demo Dash App", className="ml-2", style={'letter-spacing': '5px'})),
                         ],
                         align="center",
                         no_gutters=True,

@@ -1,29 +1,23 @@
 
-import adal
+import msal
 import uuid
 import requests
 import flask
 from flask import Blueprint, render_template
-from flask import current_app
-from .user import GraphUser as User
-from .__functions import get_authentication_url, get_logout_url
+from flask import current_app, session, url_for, render_template, request, redirect
 
 
-def construct_blueprint(auth_config: dict):
+def construct_blueprint(auth_config: dict, application_root_uri: str = None) -> Blueprint:
     """Get a blueprint for authentication, with routes at /auth/login and /auth/logout.
     
     Args:
         auth_config: dict containing auth config. Must contain keys:
-            TENANT: AAD tenant aka directory, can be gui or name
+            TENANT: AAD tenant aka directory, can be guid or name
             CLIENT_ID: Your application's client id aka "applicationID"
             CLIENT_SECRET: Your application's client secret aka "applicationKey"
             HTTPS_SCHEME: either 'https' or 'http', should always be 'https' in production
-            AUTH_RESOURCE: the resource of the application that contains user roles
-            AUTH_USER_INFO_ENDPOINT: the endpoint that returns the user's roles, on the application that contains user roles
-            AUTH_APP_REG_DISPLAY_NAME: the display nanme of the app reg, for the application that contains user roles
-
-    NOTE 'the application that contains user roles' is normally a seperate back-end service API for your application. For a stand alone web app, can use the MS Graph API.
-
+        application_root_uri: Where to redirect on successful authentication, defaults to flask.url_for('index')
+    
     Returns:
         flask.Blueprint called 'auth'
     """
@@ -31,16 +25,13 @@ def construct_blueprint(auth_config: dict):
         'TENANT', 
         'CLIENT_ID',
         'CLIENT_SECRET',
-        'HTTPS_SCHEME',
-        'AUTH_RESOURCE',
-        'AUTH_USER_INFO_ENDPOINT',
-        'AUTH_APP_REG_DISPLAY_NAME'
+        'HTTPS_SCHEME'
     }
     intersection = required_keys & auth_config.keys()
     if len(intersection) != len(required_keys):
         missing_keys = required_keys - intersection
         raise ValueError('auth_config dict missing required keys: ' + ','.join(missing_keys))        
-
+    
     bp = Blueprint('auth', __name__, template_folder='templates')
 
     # Register blueprint routes
@@ -50,82 +41,150 @@ def construct_blueprint(auth_config: dict):
 
     @bp.route("/login")
     def login():
-        auth_state = str(uuid.uuid4())
-        flask.session['state'] = auth_state
-        redirect_uri = flask.url_for('.signin_oidc', _external=True, _scheme=auth_config['HTTPS_SCHEME'])
-        authorization_url = get_authentication_url(
-            auth_config['TENANT'],
-            auth_config['CLIENT_ID'],
-            auth_config['AUTH_RESOURCE'],
-            redirect_uri,
-            auth_state)
+        redirect_uri = url_for('.signin_oidc', _external=True, _scheme=auth_config['HTTPS_SCHEME'])
+        session["state"] = str(uuid.uuid4())
+        auth_url = _build_auth_url(
+            auth_config=auth_config,
+            redirect_uri=redirect_uri,
+            state=session["state"])
         resp = flask.Response(status=307)
-        resp.headers['location'] = authorization_url
+        resp.headers['location'] = auth_url
         return resp
-
+    
     @bp.route("/signin-oidc")
     def signin_oidc():
         """
-        This is the re-direct from the MS Auth template
-        Here, we try and get an authentication token for calls to the API from the app.
-        We then use the token to check the user has at least Read access
-            - If we can, we save to the flask session for future use.
-            - If we can't, we fail authentication
-
-        Once complete, redirect to the home page
+        This is the re-direct from MS interactive authentication kicked off in the 'login' function
+        Here, we get an authentication token for the app, and check the user has permissions (has a user role of at least read access)
+        If successful, redirects to the home page of the application, by default a `url_for('index')` route
         """
-        state = flask.request.args['state']
-        if state != flask.session['state']:
+        app_root_uri = application_root_uri or url_for('index')
+
+        if request.args.get('state') != session.get("state"):
             raise ValueError("State does not match")
-
-        redirect_uri = flask.url_for('.signin_oidc', _external=True, _scheme=auth_config['HTTPS_SCHEME'])
-        code = flask.request.args['code']
-
-        context = adal.AuthenticationContext('https://login.microsoftonline.com/' + auth_config['TENANT'])
-        token_response = context.acquire_token_with_authorization_code(
-            code, 
-            redirect_uri, 
-            auth_config['AUTH_RESOURCE'], 
-            auth_config['CLIENT_ID'], 
-            auth_config['CLIENT_SECRET'])
-
-        if not 'accessToken' in token_response:
-            raise adal.AdalError("Authentication Failed - no 'accessToken' found in token_response = " + token_response)
+        if "error" in request.args:  # Authentication/Authorization failure
+            return render_template("auth_error.html", result=request.args, application_root_uri=app_root_uri)
         
-        # Get and check user has at least read access to the app
-        user = User(token_response, auth_config)
+        redirect_uri = url_for('.signin_oidc', _external=True, _scheme=auth_config['HTTPS_SCHEME'])
+        code = request.args['code']
+
         
-        if not user.has_read_access():
-            raise adal.AdalError('Authentication Failed - You do not have at least read access to this application. Please ask support to grant it.')
-        flask.session['user.displayName'] = user.display_name
-        flask.session['user.email'] = user.email
 
-        # Save the access token to the flask session for use by the app later
-        flask.session['authToken.accessToken'] = token_response['accessToken']
-        flask.session['authToken.refreshToken'] = token_response['refreshToken']
-        flask.session['authToken.expiresOn'] = token_response['expiresOn']
+        if request.args.get('code'):
+            cache = _load_cache()
+            result = _build_msal_app(auth_config=auth_config, cache=cache).acquire_token_by_authorization_code(
+                request.args['code'],
+                scopes=["User.Read"],
+                redirect_uri=redirect_uri)
 
+            if "error" in result:
+                return render_template("auth_error.html", result=result, application_root_uri=app_root_uri)
+            
+            user = result.get("id_token_claims")
+            
+            if not _has_read_access(user):
+                result = {"error": "Authentication Failed", "error_description": "User does not have at least read access to this application."}
+                return render_template("auth_error.html", result=result, application_root_uri=app_root_uri)
+
+            session["user"] = user
+            _save_cache(cache)
+                
         # Redirect to home page, authentication was successful
-        current_app.logger.info(f'User authentication successful for {user.display_name}')
-        return flask.redirect(flask.url_for('index'))
+        current_app.logger.info(f"User authentication successful for {session['user'].get('name', 'unknown')}")
+        return redirect(app_root_uri)
 
     # somewhere to logout
     @bp.route("/logout")
     def logout():
         current_app.logger.info(f'Logout requested')
-        flask.session.clear()
-        logout_redirect_uri = flask.url_for('.logout_complete', _external=True)
-        logout_url = get_logout_url(auth_config['TENANT'], logout_redirect_uri)
-        resp = flask.Response(status=307)
-        resp.headers['location'] = logout_url
-        return resp
-
+        session.clear()  # Wipe out user and its token cache from session
+        logout_url = _build_logout_url(auth_config=auth_config)
+        return redirect(logout_url)  # Also logout from your tenant's web session
+    
     @bp.route("/logout-complete")
     def logout_complete():
         current_app.logger.info(f'Logout complete')
-        return render_template("logout.html")
-        #TODO drop simple response if template works
-        #index = flask.url_for('index')
-        #return flask.Response("<h1>Logout Complete</h1><br/><p><a href=\"{0}\">Click Here</a> to go to the Home Page</p>".format(index))
-    
+        return render_template("logout.html", application_root_uri=application_root_uri or url_for('index'))
+
     return bp
+
+
+def get_json(url: str, auth_config: dict, timeout: int = 180) -> requests.Response:
+    """Performs a GET on the provided url and returns the result as json
+
+    Args:
+        url (str): url to GET
+        auth_config (dict): token returned from interactive log-on, must contain 'accessToken' entry
+        timeout (int): number of seconds to wait for connect and read timeout
+
+    Returns:
+        response (requests.Response): response
+
+    """
+    token = _get_token_from_cache(auth_config=auth_config, scope=['User.Read'])
+
+    headers = {'Authorization': f'Bearer {token["access_token"]}', 'Accept': 'application/json'}
+    response = requests.get(url, headers=headers, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
+
+
+def _build_auth_url(auth_config, redirect_uri = None, scopes=None, state=None):
+    return _build_msal_app(auth_config).get_authorization_request_url(
+        scopes = scopes or ['User.Read'],
+        state = state or str(uuid.uuid4()),
+        prompt = 'select_account',
+        redirect_uri = redirect_uri or url_for("auth.signin_oidc", _external=True, _scheme=auth_config['HTTPS_SCHEME']))
+
+
+def _build_logout_url(auth_config, redirect_url = None):
+    authority = _get_authority(auth_config['TENANT'])
+    post_logout_redirect_url = redirect_url or url_for('.logout_complete', _external=True, _scheme=auth_config['HTTPS_SCHEME'])
+    logout_url = f"{authority}/oauth2/v2.0/logout?post_logout_redirect_uri={post_logout_redirect_url}"
+    return logout_url
+
+
+def _build_msal_app(auth_config, cache=None):
+    return msal.ConfidentialClientApplication(
+        auth_config['CLIENT_ID'],
+        authority = _get_authority(auth_config['TENANT']),
+        client_credential=auth_config['CLIENT_SECRET'],
+        token_cache=cache)
+
+
+def _load_cache():
+    cache = msal.SerializableTokenCache()
+    if session.get("token_cache"):
+        cache.deserialize(session["token_cache"])
+    return cache
+
+
+def _save_cache(cache):
+    if cache.has_state_changed:
+        session["token_cache"] = cache.serialize()
+
+
+def _get_token_from_cache(auth_config, scope=None):
+    cache = _load_cache()  # This web app maintains one cache per session
+    cca = _build_msal_app(auth_config, cache=cache)
+    accounts = cca.get_accounts()
+    if accounts:  # So all account(s) belong to the current signed-in user
+        result = cca.acquire_token_silent(scope, account=accounts[0])
+        _save_cache(cache)
+        return result
+
+
+def _get_authority(tenant: str) -> str:
+    return f'https://login.microsoftonline.com/{tenant}'
+
+
+def _has_read_access(user: dict):
+    return _has_admin_access(user) or _has_write_access(user) or any("READ" in role.upper() for role in user.get('roles', []))
+
+
+def _has_write_access(user: dict):
+    return _has_admin_access(user) or any("WRITE" in role.upper() for role in user.get('roles', []))
+
+
+def _has_admin_access(user: dict):
+    return any("ADMIN" in role.upper() for role in user.get('roles', []))
