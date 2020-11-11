@@ -18,7 +18,6 @@ def str2bool(v):
 # App Settings
 APP_VERSION = os.environ.get('APP_VERSION', config["app_version"])
 PORT = os.environ.get('PORT', config["port"])
-APPLICATION_ROOT_URI = os.environ.get('APPLICATION_ROOT_URI', config['application_root_uri'])
 APPLICATION_HOME = os.environ.get('APPLICATION_HOME', config['application_home'])
 REQUIRE_AUTHENTICATION = str2bool(os.environ.get('REQUIRE_AUTHENTICATION', config['require_authentication'])) #Obviously, should be true in prod
 
@@ -29,11 +28,6 @@ CLIENT_ID = os.environ.get('CLIENT_ID', config["AzureAd"]["client_id"])
 CLIENT_SECRET = os.environ.get('CLIENT_SECRET', config["AzureAd"]["client_secret"])
 CALLBACK_PATH = '/auth/signin-oidc'
 HTTPS_SCHEME = 'https' if APPLICATION_HOME.startswith('https') else 'http'
-APPLICATION_REGISTRATION_DISPLAY_NAME = os.environ.get('APPLICATION_REGISTRATION_DISPLAY_NAME', config["AzureAd"]["application_registration_display_name"])
-
-# Graph Api
-GRAPH_RESOURCE = os.environ.get('GRAPH_RESOURCE', config["Graph"]["resource"])
-GRAPH_BASE_URI = os.environ.get('GRAPH_BASE_URI', config["Graph"]["base_uri"])
 
 # RapidAPI Rugby API
 RAPIDAPI_KEY = config["RapidApiRugby"]["rapidapi-key"]
@@ -44,8 +38,7 @@ AuthenticationConfig = {
     "TENANT": TENANT,
     "CLIENT_ID": CLIENT_ID,
     "CLIENT_SECRET": CLIENT_SECRET,
-    "HTTPS_SCHEME": HTTPS_SCHEME,
-    "AUTHORITY": f'https://login.microsoftonline.com/{TENANT}'
+    "HTTPS_SCHEME": HTTPS_SCHEME
 }
 
 # Flask App Config

@@ -9,19 +9,22 @@ def login_required(f):
     Decorator for flask endpoints, ensuring that the user is authenticated and redirecting to log-in page if not.
     Example:
     ```
-        from server import server
+        from flask import current_app as app
         @login_required
-        @server.route("/")
-        def home():
-            return 'protected data'
+        @app.route("/")
+        def index():
+            return 'route protected'
     ```
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not config.REQUIRE_AUTHENTICATION:
-            # Disable authentication, for dev/test only!
+            # Disable authentication, for use in dev/test only!
+            if config.HTTPS_SCHEME == 'https':
+                raise ValueError('Not supported: Cant turn off authentication for https endpoints')
+
             current_app.logger.error('Authentication is disabled! For dev/test only!')
-            flask.session['user'] = {'name': 'AUTHENTICATION DISABLED'}
+            flask.session['user'] = {'name': 'auth disabled'}
             return f(*args, **kwargs)
 
         if not flask.session.get("user"):

@@ -35,10 +35,10 @@ def construct_blueprint(auth_config: dict, application_root_uri: str = None) -> 
     bp = Blueprint('auth', __name__, template_folder='templates')
 
     # Register blueprint routes
-    @bp.route('/hello')
-    def hello():
-        return '<h1>Hello auth blueprint</h1>'
-
+    @bp.route('/ping')
+    def ping():
+        return '<h1>Hello, Auth blueprint</h1>'
+    
     @bp.route("/login")
     def login():
         redirect_uri = url_for('.signin_oidc', _external=True, _scheme=auth_config['HTTPS_SCHEME'])
@@ -66,9 +66,7 @@ def construct_blueprint(auth_config: dict, application_root_uri: str = None) -> 
             return render_template("auth_error.html", result=request.args, application_root_uri=app_root_uri)
         
         redirect_uri = url_for('.signin_oidc', _external=True, _scheme=auth_config['HTTPS_SCHEME'])
-        code = request.args['code']
-
-        
+        code = request.args['code']        
 
         if request.args.get('code'):
             cache = _load_cache()
@@ -85,10 +83,10 @@ def construct_blueprint(auth_config: dict, application_root_uri: str = None) -> 
             if not _has_read_access(user):
                 result = {"error": "Authentication Failed", "error_description": "User does not have at least read access to this application."}
                 return render_template("auth_error.html", result=result, application_root_uri=app_root_uri)
-
+            
             session["user"] = user
             _save_cache(cache)
-                
+            
         # Redirect to home page, authentication was successful
         current_app.logger.info(f"User authentication successful for {session['user'].get('name', 'unknown')}")
         return redirect(app_root_uri)
@@ -104,29 +102,10 @@ def construct_blueprint(auth_config: dict, application_root_uri: str = None) -> 
     @bp.route("/logout-complete")
     def logout_complete():
         current_app.logger.info(f'Logout complete')
-        return render_template("logout.html", application_root_uri=application_root_uri or url_for('index'))
+        app_root_uri = application_root_uri or url_for('index')
+        return render_template("logout.html", application_root_uri=app_root_uri)
 
     return bp
-
-
-def get_json(url: str, auth_config: dict, timeout: int = 180) -> requests.Response:
-    """Performs a GET on the provided url and returns the result as json
-
-    Args:
-        url (str): url to GET
-        auth_config (dict): token returned from interactive log-on, must contain 'accessToken' entry
-        timeout (int): number of seconds to wait for connect and read timeout
-
-    Returns:
-        response (requests.Response): response
-
-    """
-    token = _get_token_from_cache(auth_config=auth_config, scope=['User.Read'])
-
-    headers = {'Authorization': f'Bearer {token["access_token"]}', 'Accept': 'application/json'}
-    response = requests.get(url, headers=headers, timeout=timeout)
-    response.raise_for_status()
-    return response.json()
 
 
 def _build_auth_url(auth_config, redirect_uri = None, scopes=None, state=None):

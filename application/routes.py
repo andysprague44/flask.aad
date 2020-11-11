@@ -5,28 +5,23 @@ import time
 import traceback
 import msal
 from blueprints.auth.decorators import login_required
-from .dashapp import get_layout
 from . import appsettings as config
-from .dashapp import get_layout
 from flask import current_app as app
 
 
 @app.route("/")
 @login_required
 def index():
-    if config.REQUIRE_AUTHENTICATION:
-        # Check user is authenticated
-        try:
-            user = flask.session['user']
-            displayName = user.get('name', 'Unknown')
-            app.logger.info(f'{displayName} logged in successfully')
-        except Exception as ex:
-            app.logger.error('Authentication failed: {ex}')
-            raise Exception('Authentication failed. Please try again. ' + str(ex))
-    
+    # Probably don't need this additional check, but just in case!
+    try:
+        app.logger.info(f"{flask.session['user']['name']} logged in successfully")
+    except Exception as ex:
+        app.logger.error('No user found in the flask session. Did authentication fail? {ex}')
+        raise
+
     # Load (dash) app
     #return render_template('index.html', user=session["user"], version=msal.__version__)
-    return flask.redirect('dash/')
+    return flask.redirect('/dash')
 
 
 @app.errorhandler(404)
