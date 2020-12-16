@@ -32,14 +32,8 @@ COPY ./application /app/application
 COPY ./blueprints /app/blueprints
 COPY wsgi.py /app/wsgi.py
 
+# Run then remove dos2unix
 RUN find . -type f -print0 | xargs -0 dos2unix
-
-# Add entrypoint script
-COPY docker-init.sh /usr/local/bin/
-RUN chmod u+x /usr/local/bin/docker-init.sh
-RUN dos2unix /usr/local/bin/docker-init.sh
-
-# Remove dos2unix
 RUN apt-get --purge remove -y dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
